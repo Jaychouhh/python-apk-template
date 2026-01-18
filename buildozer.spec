@@ -40,6 +40,16 @@ fullscreen = 0
 # Android 特定
 android.accept_sdk_license = True
 
+# ========== Release 签名配置 ==========
+# 构建 Release 版本前，需要创建签名密钥:
+# keytool -genkey -v -keystore ~/my-release-key.keystore -alias myapp -keyalg RSA -keysize 2048 -validity 10000
+#
+# 然后取消下面的注释并填写信息:
+# android.keystore = ~/my-release-key.keystore
+# android.keyalias = myapp
+# android.keystore_password = 你的密码
+# android.keyalias_password = 你的密码
+
 [buildozer]
 log_level = 2
 warn_on_root = 1

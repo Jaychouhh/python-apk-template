@@ -261,6 +261,48 @@ presplash.filename = presplash.png
 
 ---
 
+## 构建 Release 版本 (签名 APK)
+
+Release 版本需要签名才能安装到手机上，适合正式发布。
+
+### 1. 创建签名密钥 (只需一次)
+
+```bash
+keytool -genkey -v -keystore ~/my-release-key.keystore -alias myapp -keyalg RSA -keysize 2048 -validity 10000
+```
+
+按提示输入密码和信息。**请妥善保管此文件和密码，丢失后无法更新应用。**
+
+### 2. 配置签名信息
+
+编辑 `buildozer.spec`，取消注释并填写：
+
+```ini
+android.keystore = ~/my-release-key.keystore
+android.keyalias = myapp
+android.keystore_password = 你设置的密码
+android.keyalias_password = 你设置的密码
+```
+
+### 3. 构建 Release APK
+
+```bash
+./build.sh release
+```
+
+生成的 APK 位于 `bin/` 目录，可以上传到应用商店或直接分发。
+
+### Debug vs Release 区别
+
+| 特性 | Debug | Release |
+|------|-------|---------|
+| 签名 | 自动生成调试签名 | 需要正式签名 |
+| 体积 | 较大 | 较小 (优化过) |
+| 性能 | 包含调试信息 | 优化后更快 |
+| 用途 | 开发测试 | 正式发布 |
+
+---
+
 ## 常见问题
 
 ### Q: 构建失败，提示找不到 SDK/NDK
