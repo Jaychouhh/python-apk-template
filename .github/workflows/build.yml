@@ -23,42 +23,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            git \
-            zip \
-            unzip \
-            openjdk-17-jdk \
-            autoconf \
-            automake \
-            libtool \
-            libltdl-dev \
-            pkg-config \
-            zlib1g-dev \
-            libncurses5-dev \
-            libncursesw5-dev \
-            cmake \
-            libffi-dev \
-            libssl-dev \
-            ccache
-
-          # 确保 libtool 宏可用
-          sudo ln -sf /usr/share/aclocal/ltdl.m4 /usr/share/aclocal/ 2>/dev/null || true
-          sudo ln -sf /usr/share/aclocal/lt~obsolete.m4 /usr/share/aclocal/ 2>/dev/null || true
-
-      - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip setuptools wheel
-          pip install buildozer cython kivy
-
       - name: Generate signing key (for release)
         if: ${{ github.event.inputs.build_type == 'release' || github.event_name == 'push' }}
         run: |
@@ -77,13 +41,16 @@ jobs:
           sed -i 's/# android.keystore_password = 123456/android.keystore_password = 123456/' buildozer.spec
           sed -i 's/# android.keyalias_password = 123456/android.keyalias_password = 123456/' buildozer.spec
 
-      - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          command: buildozer android ${{ github.event.inputs.build_type || 'release' }}
-          workdir: .
-          buildozer_version: stable
+      - name: Build with Buildozer Docker
+        run: |
+          BUILD_TYPE=${{ github.event.inputs.build_type || 'release' }}
+          echo "Building $BUILD_TYPE APK..."
+
+          docker run --rm \
+            -v "$(pwd)":/home/user/hostcwd \
+            -w /home/user/hostcwd \
+            kivy/buildozer:latest \
+            buildozer android $BUILD_TYPE
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -96,3 +63,7 @@ jobs:
         run: |
           echo "=== Build Complete ==="
           ls -lh bin/*.apk || echo "No APK found"
+          echo ""
+          echo "App Info:"
+          echo "  Name: 示例计算器应用"
+          echo "  Package: com.jay.python2apkexample"
