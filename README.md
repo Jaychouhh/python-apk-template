@@ -137,9 +137,53 @@ python-apk-template/
 
 ## Windows 用户指南
 
-Buildozer 不支持直接在 Windows 上运行，需要使用 WSL2 (Windows Subsystem for Linux)。
+Windows 不能直接运行 Buildozer，有以下几种方案：
 
-### 安装 WSL2
+### 方案一：GitHub Actions (推荐)
+
+**无需配置任何本地环境**，直接在云端构建。
+
+1. Fork 或 clone 本项目到你的 GitHub
+2. 修改代码后 push 到 GitHub
+3. 进入 GitHub 仓库页面 -> `Actions` -> `Build APK`
+4. 点击 `Run workflow`，选择 debug 或 release
+5. 等待构建完成，下载 APK
+
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-自动构建-2088FF?logo=github-actions)
+
+### 方案二：Docker
+
+```bash
+# 安装 Docker Desktop for Windows
+
+# 使用官方镜像构建
+docker run -v "%cd%":/app -w /app kivy/buildozer android debug
+```
+
+### 方案三：Google Colab (免费云端)
+
+1. 打开 [Google Colab](https://colab.research.google.com/)
+2. 上传项目文件或从 GitHub 克隆
+3. 运行以下代码：
+
+```python
+# 安装依赖
+!pip install buildozer cython
+!sudo apt-get install -y openjdk-17-jdk
+
+# 克隆你的项目
+!git clone https://github.com/你的用户名/python-apk-template.git
+%cd python-apk-template
+
+# 构建
+!buildozer android debug
+
+# 下载 APK
+from google.colab import files
+files.download('bin/你的应用名-1.0.0-debug.apk')
+```
+
+### 方案四：WSL2
 
 ```powershell
 # 1. 以管理员身份打开 PowerShell，运行：
@@ -150,7 +194,7 @@ wsl --install -d Ubuntu
 # 3. 打开 Ubuntu，设置用户名和密码
 ```
 
-### 在 WSL 中构建
+在 WSL 中构建：
 
 ```bash
 # 1. 进入 WSL
@@ -167,7 +211,7 @@ cd /mnt/d/projects/python-apk-template
 ./build.sh debug
 ```
 
-### Windows 路径映射规则
+### Windows 路径映射规则 (WSL)
 
 | Windows 路径 | WSL 路径 |
 |-------------|----------|
