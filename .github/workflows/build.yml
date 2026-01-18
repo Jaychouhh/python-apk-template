@@ -26,14 +26,16 @@ jobs:
       - name: Download Chinese font
         run: |
           mkdir -p fonts
-          # 从 Google Fonts 下载 Noto Sans SC
-          curl -L -o /tmp/NotoSansSC.zip "https://fonts.google.com/download?family=Noto%20Sans%20SC"
+          # 从 GitHub releases 下载 Noto Sans SC 静态字体
+          curl -L -o /tmp/NotoSansSC.zip "https://github.com/notofonts/noto-cjk/releases/download/Sans2.004/08_NotoSansSCHK.zip"
           unzip -o /tmp/NotoSansSC.zip -d /tmp/noto/
-          # 找到 Regular 字体并复制
-          find /tmp/noto/ -name "*Regular*.ttf" -o -name "*Regular*.otf" | head -1 | xargs -I {} cp {} fonts/NotoSansSC-Regular.ttf
-          # 如果上面失败，尝试任意一个字体文件
+          # 查看解压内容
+          find /tmp/noto/ -type f -name "*.ttf" -o -name "*.otf" | head -20
+          # 复制 Regular 字体
+          find /tmp/noto/ -type f \( -name "*SC-Regular*" -o -name "*SimplifiedChinese*Regular*" \) | head -1 | xargs -I {} cp {} fonts/NotoSansSC-Regular.ttf
+          # 如果没找到，用任意 SC 字体
           if [ ! -f fonts/NotoSansSC-Regular.ttf ]; then
-            find /tmp/noto/ -name "*.ttf" -o -name "*.otf" | head -1 | xargs -I {} cp {} fonts/NotoSansSC-Regular.ttf
+            find /tmp/noto/ -type f -name "*.otf" | head -1 | xargs -I {} cp {} fonts/NotoSansSC-Regular.ttf
           fi
           ls -la fonts/
 
