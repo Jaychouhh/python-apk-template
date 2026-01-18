@@ -40,6 +40,9 @@ fullscreen = 0
 # Android 特定
 android.accept_sdk_license = True
 
+# 生成 APK 而不是 AAB
+android.release_artifact = apk
+
 # ========== Release 签名配置 ==========
 # 签名密钥会在 GitHub Actions 中自动生成
 # 如需本地构建 Release，请创建密钥:
