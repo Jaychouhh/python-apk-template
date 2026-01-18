@@ -6,7 +6,8 @@
 
 - 开箱即用的项目结构
 - 简洁的 GUI 界面，支持输入参数和显示输出
-- 一键构建脚本
+- GitHub Actions 云端构建 (推荐，无需本地环境)
+- 支持中文显示
 - 详细的配置说明
 
 ## 环境要求
@@ -156,8 +157,19 @@ Windows 不能直接运行 Buildozer，有以下几种方案：
 ```bash
 # 安装 Docker Desktop for Windows
 
-# 使用官方镜像构建
-docker run -v "%cd%":/app -w /app kivy/buildozer android debug
+# 使用官方镜像构建 (Linux/macOS)
+docker run --rm \
+  --entrypoint="" \
+  -v "$(pwd)":/home/user/hostcwd \
+  -w /home/user/hostcwd \
+  kivy/buildozer:latest \
+  buildozer android debug
+
+# Windows CMD
+docker run --rm --entrypoint="" -v "%cd%":/home/user/hostcwd -w /home/user/hostcwd kivy/buildozer:latest buildozer android debug
+
+# Windows PowerShell
+docker run --rm --entrypoint="" -v "${PWD}:/home/user/hostcwd" -w /home/user/hostcwd kivy/buildozer:latest buildozer android debug
 ```
 
 ### 方案三：Google Colab (免费云端)
