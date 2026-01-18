@@ -9,7 +9,7 @@ package.domain = com.jay
 
 # 源代码目录
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,json,txt
+source.include_exts = py,png,jpg,kv,atlas,json,txt,ttf
 
 # 版本号
 version = 1.0.0

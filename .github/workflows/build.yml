@@ -23,6 +23,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Download Chinese font
+        run: |
+          mkdir -p fonts
+          # 从 Google Fonts 下载 Noto Sans SC
+          curl -L -o /tmp/NotoSansSC.zip "https://fonts.google.com/download?family=Noto%20Sans%20SC"
+          unzip -o /tmp/NotoSansSC.zip -d /tmp/noto/
+          # 找到 Regular 字体并复制
+          find /tmp/noto/ -name "*Regular*.ttf" -o -name "*Regular*.otf" | head -1 | xargs -I {} cp {} fonts/NotoSansSC-Regular.ttf
+          # 如果上面失败，尝试任意一个字体文件
+          if [ ! -f fonts/NotoSansSC-Regular.ttf ]; then
+            find /tmp/noto/ -name "*.ttf" -o -name "*.otf" | head -1 | xargs -I {} cp {} fonts/NotoSansSC-Regular.ttf
+          fi
+          ls -la fonts/
+
       - name: Generate signing key (for release)
         if: ${{ github.event.inputs.build_type == 'release' || github.event_name == 'push' }}
         run: |

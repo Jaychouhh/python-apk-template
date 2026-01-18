@@ -2,6 +2,10 @@
 Python APK Template - 主入口文件
 用户无需修改此文件，只需修改 app/your_code.py
 """
+import os
+import sys
+from io import StringIO
+
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
@@ -10,9 +14,16 @@ from kivy.uix.button import Button
 from kivy.uix.scrollview import ScrollView
 from kivy.core.window import Window
 from kivy.utils import platform
+from kivy.core.text import LabelBase
 
-import sys
-from io import StringIO
+# 注册中文字体
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts')
+FONT_PATH = os.path.join(FONT_DIR, 'NotoSansSC-Regular.ttf')
+if os.path.exists(FONT_PATH):
+    LabelBase.register(name='NotoSansSC', fn_regular=FONT_PATH)
+    DEFAULT_FONT = 'NotoSansSC'
+else:
+    DEFAULT_FONT = None
 
 # 导入用户代码
 from app.your_code import run
@@ -34,12 +45,14 @@ class MainApp(App):
         self.input_field = TextInput(
             hint_text='输入参数 (可选)',
             multiline=False,
-            size_hint_x=0.7
+            size_hint_x=0.7,
+            font_name=DEFAULT_FONT if DEFAULT_FONT else 'Roboto'
         )
         run_btn = Button(
             text='运行',
             size_hint_x=0.3,
-            on_press=self.execute_code
+            on_press=self.execute_code,
+            font_name=DEFAULT_FONT if DEFAULT_FONT else 'Roboto'
         )
         input_layout.add_widget(self.input_field)
         input_layout.add_widget(run_btn)
@@ -51,7 +64,8 @@ class MainApp(App):
             size_hint_y=None,
             text_size=(Window.width - 40, None),
             halign='left',
-            valign='top'
+            valign='top',
+            font_name=DEFAULT_FONT if DEFAULT_FONT else 'Roboto'
         )
         self.output_label.bind(texture_size=self.output_label.setter('size'))
         scroll.add_widget(self.output_label)
@@ -60,7 +74,8 @@ class MainApp(App):
         clear_btn = Button(
             text='清除输出',
             size_hint_y=0.05,
-            on_press=self.clear_output
+            on_press=self.clear_output,
+            font_name=DEFAULT_FONT if DEFAULT_FONT else 'Roboto'
         )
 
         layout.add_widget(input_layout)
