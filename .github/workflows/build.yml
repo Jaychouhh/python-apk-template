@@ -1,7 +1,6 @@
 name: Build APK
 
 on:
-  # 手动触发
   workflow_dispatch:
     inputs:
       build_type:
@@ -13,13 +12,12 @@ on:
           - debug
           - release
 
-  # push 到 main 分支时自动构建
   push:
     branches: [ main ]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -28,7 +26,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
       - name: Install system dependencies
         run: |
@@ -42,7 +40,7 @@ jobs:
             autoconf \
             automake \
             libtool \
-            libtool-bin \
+            libltdl-dev \
             pkg-config \
             zlib1g-dev \
             libncurses5-dev \
@@ -50,17 +48,20 @@ jobs:
             cmake \
             libffi-dev \
             libssl-dev \
-            lld
+            ccache
+
+          # 确保 libtool 宏可用
+          sudo ln -sf /usr/share/aclocal/ltdl.m4 /usr/share/aclocal/ 2>/dev/null || true
+          sudo ln -sf /usr/share/aclocal/lt~obsolete.m4 /usr/share/aclocal/ 2>/dev/null || true
 
       - name: Install Python dependencies
         run: |
-          pip install --upgrade pip
+          pip install --upgrade pip setuptools wheel
           pip install buildozer cython kivy
 
       - name: Generate signing key (for release)
         if: ${{ github.event.inputs.build_type == 'release' || github.event_name == 'push' }}
         run: |
-          # 生成签名密钥 (密码: 123456)
           keytool -genkey -v \
             -keystore release.keystore \
             -alias release \
@@ -71,22 +72,18 @@ jobs:
             -keypass 123456 \
             -dname "CN=Jay, OU=Dev, O=Jay, L=City, ST=State, C=CN"
 
-          # 更新 buildozer.spec 启用签名
           sed -i 's/# android.keystore = release.keystore/android.keystore = release.keystore/' buildozer.spec
           sed -i 's/# android.keyalias = release/android.keyalias = release/' buildozer.spec
           sed -i 's/# android.keystore_password = 123456/android.keystore_password = 123456/' buildozer.spec
           sed -i 's/# android.keyalias_password = 123456/android.keyalias_password = 123456/' buildozer.spec
 
-          echo "Signing key generated successfully"
-
-      - name: Build APK
-        run: |
-          BUILD_TYPE=${{ github.event.inputs.build_type || 'release' }}
-          echo "Building $BUILD_TYPE APK..."
-          echo "Package: com.jay.python2apkexample"
-          echo "App Name: 示例计算器应用"
-
-          buildozer android $BUILD_TYPE
+      - name: Build with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          command: buildozer android ${{ github.event.inputs.build_type || 'release' }}
+          workdir: .
+          buildozer_version: stable
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -98,11 +95,4 @@ jobs:
       - name: Build summary
         run: |
           echo "=== Build Complete ==="
-          echo ""
-          echo "APK Files:"
-          ls -lh bin/*.apk
-          echo ""
-          echo "App Info:"
-          echo "  Name: 示例计算器应用"
-          echo "  Package: com.jay.python2apkexample"
-          echo "  Version: 1.0.0"
+          ls -lh bin/*.apk || echo "No APK found"
