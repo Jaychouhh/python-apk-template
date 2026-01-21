@@ -2010,28 +2010,31 @@ class BDSMForumSpider:
 
     def vote_single_gui(self, task_id: int):
         """GUI版本的单次投票功能（无需交互输入，显示原始JSON响应）"""
-        print(f"\n🗳️ 单任务投票: {task_id}")
-        print("=" * 60)
+        print(f"\n[单任务投票] 任务ID: {task_id}")
+        print("=" * 50)
 
         # 1. 先检查任务状态
-        print(f"📋 检查任务 {task_id} 状态...")
+        print(f"[检查] 任务 {task_id} 状态...")
         url_check = f"{self.base_url}/api.php/play/pds"
         try:
             r_check = requests.post(url_check, headers=self.headers, json={"id": str(task_id)}, timeout=5)
             if r_check.status_code == 200:
                 check_data = r_check.json()
-                print(f"\n📄 检查响应 (原始JSON):")
-                print(json.dumps(check_data, ensure_ascii=False, indent=2))
+                # 限制 JSON 输出长度，避免卡顿
+                json_str = json.dumps(check_data, ensure_ascii=False, indent=2)
+                if len(json_str) > 2000:
+                    json_str = json_str[:2000] + "\n... (内容过长已截断)"
+                print(f"\n[检查响应]:\n{json_str}")
 
                 if check_data.get("code") != 1:
-                    print(f"\n❌ 任务无效: {check_data.get('msg', '未知错误')}")
+                    print(f"\n[失败] 任务无效: {check_data.get('msg', '未知错误')}")
                     return
-                print(f"\n✅ 任务有效，开始投票...")
+                print(f"\n[通过] 任务有效，开始投票...")
             else:
-                print(f"❌ 检查请求失败: HTTP {r_check.status_code}")
+                print(f"[失败] 检查请求失败: HTTP {r_check.status_code}")
                 return
         except Exception as e:
-            print(f"❌ 检查请求异常: {e}")
+            print(f"[异常] 检查请求异常: {e}")
             return
 
         # 2. 执行投票
@@ -2040,24 +2043,27 @@ class BDSMForumSpider:
             r_vote = requests.post(url_vote, headers=self.headers, json={"id": task_id, "type": 1}, timeout=5)
             if r_vote.status_code == 200:
                 vote_data = r_vote.json()
-                print(f"\n📄 投票响应 (原始JSON):")
-                print(json.dumps(vote_data, ensure_ascii=False, indent=2))
+                # 限制 JSON 输出长度
+                json_str = json.dumps(vote_data, ensure_ascii=False, indent=2)
+                if len(json_str) > 2000:
+                    json_str = json_str[:2000] + "\n... (内容过长已截断)"
+                print(f"\n[投票响应]:\n{json_str}")
 
                 code = vote_data.get("code")
                 msg = vote_data.get("msg", "")
 
                 if code == 1:
-                    print(f"\n✅ 投票成功: {msg}")
+                    print(f"\n[成功] 投票成功: {msg}")
                 elif code == 0 and ("已投" in msg or "重复" in msg or "投过" in msg):
-                    print(f"\n🔄 已投过票: {msg}")
+                    print(f"\n[提示] 已投过票: {msg}")
                 else:
-                    print(f"\n❌ 投票失败: {msg}")
+                    print(f"\n[失败] 投票失败: {msg}")
             else:
-                print(f"❌ 投票请求失败: HTTP {r_vote.status_code}")
+                print(f"[失败] 投票请求失败: HTTP {r_vote.status_code}")
         except Exception as e:
-            print(f"❌ 投票请求异常: {e}")
+            print(f"[异常] 投票请求异常: {e}")
 
-        print("=" * 60)
+        print("=" * 50)
 
     def batch_vote(self):
         print("\n" + "="*60)
@@ -2644,6 +2650,79 @@ class BDSMForumSpider:
                 break
 
     # ========== GUI 适配方法 ==========
+    def crawl_user_posts_gui(self, user_id: int, max_pages: int = 10):
+        """GUI版本的爬取用户帖子功能（无需交互输入）"""
+        print(f"\n[爬取用户帖子] 用户ID: {user_id}")
+        print(f"[计划页数] {max_pages} 页")
+        print("=" * 50)
+
+        # 首先显示用户完整信息
+        user_info = self.get_complete_user_info(user_id)
+        if user_info:
+            print(f"\n[用户信息]:")
+            self.display_complete_user_info(user_info, prefix="   ")
+
+        all_posts = []
+        page = 1
+        total_saved = 0
+        actual_pages_crawled = 0
+
+        print(f"\n[开始] 获取用户 {user_id} 的帖子...")
+
+        while page <= max_pages:
+            print(f"\n[进度] 正在获取第 {page}/{max_pages} 页...")
+            result = self.get_user_posts(user_id, page)
+
+            if not result["success"]:
+                print(f"[失败] 第 {page} 页获取失败: {result.get('error', '未知错误')}")
+                break
+
+            posts = result["data"]
+            actual_pages_crawled += 1
+
+            if not posts:
+                print(f"[提示] 第 {page} 页没有数据，停止爬取")
+                break
+
+            print(f"[成功] 第 {page} 页获取到 {len(posts)} 个帖子")
+            all_posts.extend(posts)
+
+            # 显示当前页的帖子
+            for i, post in enumerate(posts, 1):
+                post_index = len(all_posts) - len(posts) + i
+                self.display_post_for_browsing(post, index=post_index)
+
+            # 自动保存当前页的帖子
+            if posts:
+                page_saved = 0
+                for post in posts:
+                    if self.save_post_for_user_crawl(post, user_info, manual_mode=False):
+                        page_saved += 1
+                        total_saved += 1
+                    time.sleep(0.1)
+                print(f"[保存] 第 {page} 页保存了 {page_saved}/{len(posts)} 个帖子")
+
+            # 检查是否还有更多页
+            if not result.get("has_more", False):
+                print("[提示] 已到最后一页")
+                break
+
+            page += 1
+            time.sleep(0.5)
+
+        # 统计总结果
+        print(f"\n{'='*50}")
+        print("[完成] 用户帖子爬取完成!")
+        print("=" * 50)
+        print(f"[统计]")
+        print(f"  实际爬取页数: {actual_pages_crawled}/{max_pages}")
+        print(f"  找到帖子总数: {len(all_posts)}")
+        print(f"  保存帖子总数: {total_saved}")
+        if all_posts:
+            save_rate = (total_saved / len(all_posts)) * 100
+            print(f"  保存率: {save_rate:.1f}%")
+        print(f"  保存位置: {self.users_dir}")
+
     def search_and_save_posts_gui(self, keyword, max_pages=3):
         """GUI版本的搜索帖子功能（无需交互输入）"""
         print(f"\n🔍 搜索帖子: {keyword}")

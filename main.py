@@ -710,15 +710,19 @@ class MainScreen(BoxLayout):
     def on_crawl_user(self, instance):
         dialog = InputDialog(
             title='搜索用户全部帖子',
-            fields=[{"key": "uid", "label": "用户ID", "default": ""}],
+            fields=[
+                {"key": "uid", "label": "用户ID", "default": ""},
+                {"key": "pages", "label": "搜索页数", "default": "10"},
+            ],
             callback=self._do_crawl_user
         )
         dialog.open()
 
     def _do_crawl_user(self, values):
         uid = int(values.get("uid", 0) or 0)
+        pages = int(values.get("pages", 10) or 10)
         if uid:
-            self.run_task(lambda: self.app.spider.crawl_user_posts(uid))
+            self.run_task(lambda: self.app.spider.crawl_user_posts_gui(uid, pages))
 
     def on_user_files(self, instance):
         self.run_task(lambda: self.app.spider.show_user_files())
@@ -914,6 +918,9 @@ class BDSMApp(App):
         self.title = 'BDSM 论坛工具'
         Window.clearcolor = COLORS['bg']
 
+        # 在 Android 上先请求权限
+        self._request_permissions_on_start()
+
         self.root_widget = BoxLayout()
 
         # 延迟初始化 spider 和显示登录界面
@@ -931,6 +938,25 @@ class BDSMApp(App):
         self.root_widget.add_widget(loading)
 
         return self.root_widget
+
+    def _request_permissions_on_start(self):
+        """应用启动时请求权限"""
+        try:
+            from kivy.utils import platform
+            if platform != 'android':
+                return
+
+            from android.permissions import request_permissions, Permission
+
+            # 请求存储权限
+            request_permissions([
+                Permission.WRITE_EXTERNAL_STORAGE,
+                Permission.READ_EXTERNAL_STORAGE,
+            ])
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"请求权限失败: {e}")
 
     def init_app(self, dt):
         """延迟初始化"""
