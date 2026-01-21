@@ -19,10 +19,6 @@ from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
 from kivy.uix.popup import Popup
 from kivy.uix.spinner import Spinner
 from kivy.uix.widget import Widget
-from kivy.uix.recycleview import RecycleView
-from kivy.uix.recycleview.views import RecycleDataViewBehavior
-from kivy.uix.recycleboxlayout import RecycleBoxLayout
-from kivy.properties import StringProperty, ListProperty, BooleanProperty
 from kivy.core.window import Window
 from kivy.clock import Clock, mainthread
 from kivy.core.text import LabelBase
@@ -144,75 +140,93 @@ class StyledLabel(Label):
         self.font_name = DEFAULT_FONT if DEFAULT_FONT else 'Roboto'
 
 
-class LogItem(RecycleDataViewBehavior, BoxLayout):
-    """日志条目组件 - 用于RecycleView"""
-    text = StringProperty('')
-    log_color = ListProperty([1, 1, 1, 1])
-
+class LogTextInput(TextInput):
+    """日志文本框 - 支持选择复制，只读"""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.orientation = 'horizontal'
-        self.size_hint_y = None
-        self.padding = [dp(5), dp(2)]
-
-        self.label = Label(
-            text='',
-            size_hint_y=None,
-            halign='left',
-            valign='middle',
-            font_size=dp(12),
-            font_name=DEFAULT_FONT if DEFAULT_FONT else 'Roboto',
-            markup=True
-        )
-        self.label.bind(texture_size=self._update_height)
-        self.add_widget(self.label)
-
-    def _update_height(self, instance, size):
-        self.label.height = max(size[1], dp(20))
-        self.height = self.label.height + dp(4)
-        self.label.text_size = (self.width - dp(10), None)
-
-    def refresh_view_attrs(self, rv, index, data):
-        self.text = data.get('text', '')
-        self.log_color = data.get('color', COLORS['text'])
-        self.label.text = self.text
-        self.label.color = self.log_color
-        self.label.text_size = (rv.width - dp(20), None)
-        return super().refresh_view_attrs(rv, index, data)
+        self.readonly = True
+        self.multiline = True
+        self.background_normal = ''
+        self.background_active = ''
+        self.background_color = COLORS['card']
+        self.foreground_color = COLORS['text']
+        self.cursor_color = COLORS['primary']
+        self.font_name = DEFAULT_FONT if DEFAULT_FONT else 'Roboto'
+        self.font_size = dp(13)
+        self.padding = [dp(10), dp(8)]
 
 
-class LogRecycleView(RecycleView):
-    """高性能日志RecycleView"""
-    def __init__(self, **kwargs):
+class LogDetailPopup(Popup):
+    """日志详情弹窗 - 可复制、可打开链接"""
+    def __init__(self, log_text, urls=None, **kwargs):
         super().__init__(**kwargs)
-        self.data = []
-        self.viewclass = LogItem
+        self.title = '日志详情'
+        self.title_color = COLORS['text']
+        self.size_hint = (0.95, 0.8)
+        self.background_color = COLORS['card']
+        self.separator_color = COLORS['primary']
 
-        layout = RecycleBoxLayout(
-            default_size=(None, dp(24)),
-            default_size_hint=(1, None),
-            size_hint_y=None,
-            orientation='vertical'
+        content = BoxLayout(orientation='vertical', spacing=dp(10), padding=dp(10))
+
+        # 日志内容（可选择复制）
+        scroll = ScrollView(size_hint_y=0.75)
+        self.log_input = LogTextInput(
+            text=log_text,
+            size_hint_y=None
         )
-        layout.bind(minimum_height=layout.setter('height'))
-        self.add_widget(layout)
+        self.log_input.bind(minimum_height=self.log_input.setter('height'))
+        scroll.add_widget(self.log_input)
+        content.add_widget(scroll)
 
-    def add_log(self, text, color=None):
-        """添加日志条目"""
-        if color is None:
-            color = COLORS['text']
-        self.data.append({'text': text, 'color': color})
-        # 限制最大条数
-        if len(self.data) > 500:
-            self.data = self.data[-300:]
-        self.refresh_from_data()
-        # 滚动到底部
-        Clock.schedule_once(lambda dt: setattr(self, 'scroll_y', 0), 0.1)
+        # 链接按钮区
+        if urls:
+            link_scroll = ScrollView(size_hint_y=None, height=dp(50))
+            link_layout = BoxLayout(size_hint_y=None, height=dp(45), spacing=dp(8))
+            for i, url in enumerate(urls[:5]):  # 最多显示5个链接
+                short_url = url[:30] + '...' if len(url) > 30 else url
+                btn = StyledButton(
+                    text=f'链接{i+1}',
+                    size_hint_x=None,
+                    width=dp(70),
+                    bg_color=COLORS['secondary']
+                )
+                btn.url = url
+                btn.bind(on_press=self._open_url)
+                link_layout.add_widget(btn)
+            link_scroll.add_widget(link_layout)
+            content.add_widget(link_scroll)
 
-    def clear_logs(self):
-        """清空日志"""
-        self.data = []
-        self.refresh_from_data()
+        # 按钮行
+        btn_row = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(10))
+
+        copy_btn = StyledButton(text='复制全部', bg_color=COLORS['secondary'])
+        copy_btn.bind(on_press=self._copy_text)
+
+        close_btn = StyledButton(text='关闭', bg_color=COLORS['primary'])
+        close_btn.bind(on_press=self.dismiss)
+
+        btn_row.add_widget(copy_btn)
+        btn_row.add_widget(close_btn)
+        content.add_widget(btn_row)
+
+        self.content = content
+        self._log_text = log_text
+
+    def _open_url(self, instance):
+        try:
+            import webbrowser
+            webbrowser.open(instance.url)
+        except Exception as e:
+            print(f'打开链接失败: {e}')
+
+    def _copy_text(self, instance):
+        try:
+            from kivy.core.clipboard import Clipboard
+            Clipboard.copy(self._log_text)
+            instance.text = '已复制!'
+            Clock.schedule_once(lambda dt: setattr(instance, 'text', '复制全部'), 1.5)
+        except Exception as e:
+            print(f'复制失败: {e}')
 
 
 class CardLayout(BoxLayout):
@@ -654,42 +668,42 @@ class MainScreen(BoxLayout):
 
         self.add_widget(self.tabs)
 
-        # 输出日志区（使用RecycleView高性能日志）
+        # 输出日志区（使用TextInput支持选择复制）
         log_outer = BoxLayout(orientation='vertical', size_hint_y=0.38)
 
         # 日志工具栏
-        log_toolbar = BoxLayout(size_hint_y=None, height=dp(36), spacing=dp(8), padding=[dp(5), dp(2)])
+        log_toolbar = BoxLayout(size_hint_y=None, height=dp(36), spacing=dp(5), padding=[dp(5), dp(2)])
         with log_toolbar.canvas.before:
             Color(*COLORS['card'])
             self._toolbar_rect = Rectangle(pos=log_toolbar.pos, size=log_toolbar.size)
         log_toolbar.bind(pos=self._update_toolbar, size=self._update_toolbar)
 
-        log_title = StyledLabel(text='日志输出', size_hint_x=0.4, font_size=dp(13))
-        self.log_count_label = StyledLabel(text='0条', size_hint_x=0.2, font_size=dp(11), color=COLORS['text_dim'])
+        log_title = StyledLabel(text='日志', size_hint_x=0.25, font_size=dp(13))
+        self.log_count_label = StyledLabel(text='0条', size_hint_x=0.15, font_size=dp(11), color=COLORS['text_dim'])
 
         clear_btn = StyledButton(text='清空', size_hint_x=0.2, bg_color=COLORS['secondary'], on_press=self.clear_log)
+        detail_btn = StyledButton(text='详情', size_hint_x=0.2, bg_color=COLORS['secondary'], on_press=self.show_log_detail)
         expand_btn = StyledButton(text='展开', size_hint_x=0.2, bg_color=COLORS['secondary'], on_press=self.toggle_log_expand)
         self.expand_btn = expand_btn
 
         log_toolbar.add_widget(log_title)
         log_toolbar.add_widget(self.log_count_label)
         log_toolbar.add_widget(clear_btn)
+        log_toolbar.add_widget(detail_btn)
         log_toolbar.add_widget(expand_btn)
         log_outer.add_widget(log_toolbar)
 
-        # RecycleView日志区
-        log_container = CardLayout(padding=dp(8))
-        self.log_rv = LogRecycleView()
-        with self.log_rv.canvas.before:
-            Color(*COLORS['card'])
-            self._log_bg = Rectangle(pos=self.log_rv.pos, size=self.log_rv.size)
-        self.log_rv.bind(pos=self._update_log_bg, size=self._update_log_bg)
-        log_container.add_widget(self.log_rv)
+        # TextInput日志区（可选择复制）
+        log_container = CardLayout(padding=dp(5))
+        self.log_text = LogTextInput(text='[日志输出]\n')
+        log_container.add_widget(self.log_text)
         log_outer.add_widget(log_container)
 
         self.add_widget(log_outer)
         self.log_outer = log_outer
         self._log_expanded = False
+        self._log_lines = []  # 存储日志行
+        self._detected_urls = []  # 存储检测到的URL
 
     def _update_bg(self, *args):
         self.bg_rect.pos = self.pos
@@ -703,14 +717,20 @@ class MainScreen(BoxLayout):
         self._toolbar_rect.pos = args[0].pos
         self._toolbar_rect.size = args[0].size
 
-    def _update_log_bg(self, *args):
-        self._log_bg.pos = args[0].pos
-        self._log_bg.size = args[0].size
-
     def clear_log(self, instance=None):
         """清空日志"""
-        self.log_rv.clear_logs()
+        self.log_text.text = '[日志输出]\n'
+        self._log_lines = []
+        self._detected_urls = []
         self.log_count_label.text = '0条'
+
+    def show_log_detail(self, instance=None):
+        """显示日志详情弹窗"""
+        popup = LogDetailPopup(
+            log_text=self.log_text.text,
+            urls=self._detected_urls[-20:] if self._detected_urls else None
+        )
+        popup.open()
 
     def toggle_log_expand(self, instance=None):
         """展开/收起日志区域"""
@@ -739,21 +759,19 @@ class MainScreen(BoxLayout):
         except Exception as e:
             self.log(f'打开链接失败: {e}')
 
-    def _convert_urls_to_links(self, text):
-        """将文本中的URL转换为可点击的Kivy markup链接"""
+    def _extract_urls(self, text):
+        """从文本中提取URL列表"""
         import re
-        # 匹配HTTP/HTTPS链接
         url_pattern = r'(https?://[^\s<>\[\]\"\']+)'
-
-        def replace_url(match):
-            url = match.group(1)
-            # 清理URL末尾可能的标点符号
+        urls = re.findall(url_pattern, text)
+        # 清理URL末尾的标点
+        cleaned = []
+        for url in urls:
             while url and url[-1] in '.,;:!?)':
                 url = url[:-1]
-            # 使用Kivy的ref标记创建可点击链接，蓝色下划线显示
-            return f'[ref={url}][color=4fc3f7][u]{url}[/u][/color][/ref]'
-
-        return re.sub(url_pattern, replace_url, text)
+            if url:
+                cleaned.append(url)
+        return cleaned
 
     def create_tab_content(self, buttons):
         """创建标签页内容"""
@@ -1040,22 +1058,7 @@ class MainScreen(BoxLayout):
         # 安排批量更新，避免频繁刷新UI
         if not self._log_update_scheduled:
             self._log_update_scheduled = True
-            Clock.schedule_once(self._flush_log_buffer, 0.1)
-
-    def _get_log_color(self, text):
-        """根据日志内容判断颜色"""
-        text_lower = text.lower()
-        # 成功 - 绿色
-        if any(kw in text for kw in ['成功', '完成', '保存', 'OK', '✅']):
-            return COLORS['success']
-        # 错误 - 红色
-        if any(kw in text for kw in ['错误', '失败', 'Error', 'error', '❌', '异常']):
-            return COLORS['error']
-        # 警告 - 黄色
-        if any(kw in text for kw in ['警告', '注意', 'Warning', 'warning', '⚠']):
-            return COLORS['warning']
-        # 普通 - 白色
-        return COLORS['text']
+            Clock.schedule_once(self._flush_log_buffer, 0.15)
 
     def _flush_log_buffer(self, dt=None):
         """刷新日志缓冲区到UI"""
@@ -1063,17 +1066,31 @@ class MainScreen(BoxLayout):
         if not self._log_buffer:
             return
 
-        # 逐条添加日志
+        # 合并日志并添加
         for text in self._log_buffer:
-            # 转换URL为可点击链接
-            display_text = self._convert_urls_to_links(text)
-            color = self._get_log_color(text)
-            self.log_rv.add_log(display_text, color)
+            self._log_lines.append(text)
+            # 提取URL
+            urls = self._extract_urls(text)
+            self._detected_urls.extend(urls)
 
         self._log_buffer.clear()
 
+        # 限制日志行数（保留最新500行）
+        if len(self._log_lines) > 500:
+            self._log_lines = self._log_lines[-400:]
+
+        # 限制URL数（保留最新100个）
+        if len(self._detected_urls) > 100:
+            self._detected_urls = self._detected_urls[-80:]
+
+        # 更新显示
+        self.log_text.text = '[日志输出]\n' + '\n'.join(self._log_lines)
+
         # 更新日志条数
-        self.log_count_label.text = f'{len(self.log_rv.data)}条'
+        self.log_count_label.text = f'{len(self._log_lines)}条'
+
+        # 滚动到底部
+        Clock.schedule_once(lambda dt: setattr(self.log_text, 'cursor', (0, len(self.log_text.text))), 0.1)
 
 
 class BDSMApp(App):
